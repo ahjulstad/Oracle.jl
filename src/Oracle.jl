@@ -2,6 +2,7 @@
 module Oracle
 
 import Tables
+import DBInterface
 using Dates
 
 const DEPS_FILE = joinpath(@__DIR__, "..", "deps", "deps.jl")
@@ -35,6 +36,7 @@ include("variable.jl")
 include("tables_interface.jl")
 include("messages.jl")
 include("queue.jl")
+include("dbinterface.jl")
 
 function __init__()
     # this function is defined in DEPS_FILE
