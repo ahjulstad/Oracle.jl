@@ -1152,8 +1152,9 @@ end
 
         Oracle.stmt(conn, "INSERT INTO TB_BIND_TIMESTAMP_TZ ( TS_TZ, TS_LTZ ) VALUES ( :ts_tz, :ts_ltz )") do stmt
 
-            @test_throws ErrorException stmt[:ts_tz] = ts_tz
-            @test_throws ErrorException stmt[:ts_ltz] = ts_ltz
+            # Direct binding is supported: it routes through an implicitly created Variable.
+            stmt[:ts_tz] = ts_tz
+            stmt[:ts_ltz] = ts_ltz
 
             stmt[:ts_tz] = Oracle.Variable(conn, ts_tz)
             stmt[:ts_ltz] = Oracle.Variable(conn, ts_ltz)
@@ -1183,7 +1184,9 @@ end
         bytes = rand(UInt8, 5)
 
         Oracle.stmt(conn, "INSERT INTO TB_RAW ( RAW_BYTES ) VALUES ( :a )") do stmt
-            @test_throws ErrorException stmt[1] = bytes
+            # Direct binding is supported: it routes through an implicitly created Variable.
+            stmt[1] = bytes
+
             @test_throws ErrorException Oracle.Variable(conn, bytes)
             ora_var = Oracle.Variable(conn, Vector{UInt8}, Oracle.ORA_ORACLE_TYPE_RAW, Oracle.ORA_NATIVE_TYPE_BYTES)
             ora_var[1] = bytes
