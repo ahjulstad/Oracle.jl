@@ -108,6 +108,16 @@ function get_returned_data(variable::Variable, pos::Integer)
     return [ oracle_value[i] for i in 1:ref_num_elements[] ]
 end
 
+function get_returned_statement(variable::Variable, pos::Integer=1)
+    check_bounds(variable, pos)
+    data_handle = variable.buffer_handle + (pos - 1) * sizeof(OraData)
+    stmt_handle = dpiData_getStmt(data_handle)
+    @assert stmt_handle != C_NULL "Returned REF CURSOR has no statement handle."
+    result = dpiStmt_addRef(stmt_handle)
+    error_check(context(variable), result)
+    return Stmt(variable.connection, stmt_handle, false)
+end
+
 Base.getindex(variable::Variable, pos::FetchResult) = getindex(variable, pos.buffer_row_index + 1)
 
 function Base.length(variable::Variable)

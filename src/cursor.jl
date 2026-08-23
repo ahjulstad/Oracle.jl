@@ -68,19 +68,23 @@ function query(f::Function, conn::Connection, sql::AbstractString;
     nothing
 end
 
-function execute_and_fetch_all!(stmt::Stmt; exec_mode::OraExecMode=ORA_MODE_EXEC_DEFAULT) :: ResultSet
+function fetch_all!(stmt::QueryStmt) :: ResultSet
     local schema::CursorSchema
     rows = Vector{ResultSetRow}()
 
-    query(stmt, exec_mode=exec_mode) do cursor
-        schema = cursor.schema
+    cursor = Cursor(stmt)
+    schema = cursor.schema
 
-        for row in cursor
-            push!(rows, row)
-        end
+    for row in cursor
+        push!(rows, row)
     end
 
     return ResultSet(schema, rows)
+end
+
+function execute_and_fetch_all!(stmt::Stmt; exec_mode::OraExecMode=ORA_MODE_EXEC_DEFAULT) :: ResultSet
+    execute(stmt, exec_mode=exec_mode)
+    return fetch_all!(stmt)
 end
 
 function query(f::Function, stmt::Stmt; exec_mode::OraExecMode=ORA_MODE_EXEC_DEFAULT)

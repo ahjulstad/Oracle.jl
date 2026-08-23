@@ -403,6 +403,11 @@ function dpiStmt_bindByPos(stmt_handle::Ptr{Cvoid}, pos::UInt32, variable_handle
     ccall((:dpiStmt_bindByPos, libdpi), OraResult, (Ptr{Cvoid}, UInt32, Ptr{Cvoid}), stmt_handle, pos, variable_handle)
 end
 
+# int dpiStmt_addRef(dpiStmt *stmt)
+function dpiStmt_addRef(stmt_handle::Ptr{Cvoid})
+    ccall((:dpiStmt_addRef, libdpi), OraResult, (Ptr{Cvoid},), stmt_handle)
+end
+
 #
 # ODPI Data Functions
 #
@@ -450,6 +455,11 @@ end
 # dpiLob *dpiData_getLOB(dpiData *data)
 function dpiData_getLOB(data_handle::Ref{OraData})
     ccall((:dpiData_getLOB, libdpi), Ptr{Cvoid}, (Ref{OraData},), data_handle)
+end
+
+# dpiStmt *dpiData_getStmt(dpiData *data)
+function dpiData_getStmt(data_handle::Ptr{OraData})
+    ccall((:dpiData_getStmt, libdpi), Ptr{Cvoid}, (Ptr{OraData},), data_handle)
 end
 
 # see issue #21

@@ -3,6 +3,14 @@
 
 import DBInterface
 
+struct ProcedureResult
+    cursors::Vector{ResultSet}
+end
+
+Base.length(result::ProcedureResult) = length(result.cursors)
+Base.getindex(result::ProcedureResult, index::Integer) = result.cursors[index]
+Base.iterate(result::ProcedureResult, state...) = iterate(result.cursors, state...)
+
 """
     DBConnection <: DBInterface.Connection
 
@@ -30,6 +38,42 @@ Prepare an SQL statement for execution.
 function DBInterface.prepare(conn::DBConnection, sql::AbstractString)
     return Stmt(conn.conn, sql)
 end
+
+function execute_procedure(conn::DBConnection, sql::AbstractString;
+                           params=NamedTuple(), out_cursors=())
+    stmt = Stmt(conn.conn, sql)
+    variables = Variable[]
+    try
+        for (name, value) in pairs(params)
+            stmt[name] = value
+        end
+        for name in out_cursors
+            variable = Variable(conn.conn, Any, ORA_ORACLE_TYPE_STMT, ORA_NATIVE_TYPE_STMT)
+            stmt[name] = variable
+            push!(variables, variable)
+        end
+
+        execute(stmt)
+        results = ResultSet[]
+        for variable in variables
+            cursor_stmt = get_returned_statement(variable)
+            try
+                push!(results, fetch_all!(cursor_stmt))
+            finally
+                destroy!(cursor_stmt)
+            end
+        end
+        return ProcedureResult(results)
+    finally
+        destroy!(stmt)
+        for variable in variables
+            destroy!(variable)
+        end
+    end
+end
+
+execute_procedure(conn::Connection, sql::AbstractString; kwargs...) =
+    execute_procedure(DBConnection(conn), sql; kwargs...)
 
 """
     DBInterface.execute(conn::DBConnection, sql::AbstractString; kwargs...) -> ResultSet
