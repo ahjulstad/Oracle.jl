@@ -3,7 +3,7 @@
 function OraCommonCreateParams(ctx::Context, safe_params::CommonCreateParams)
 
     function EmptyOraCommonCreateParams(ctx::Context)
-        common_create_params_ref = Ref{OraCommonCreateParams}(OraCommonCreateParams(ORA_MODE_CREATE_DEFAULT, C_NULL, C_NULL, C_NULL, 0, C_NULL, 0, 0, 0))
+        common_create_params_ref = Ref{OraCommonCreateParams}(OraCommonCreateParams(ORA_MODE_CREATE_DEFAULT, C_NULL, C_NULL, C_NULL, 0, C_NULL, 0, 0, 0, C_NULL))
         result = dpiContext_initCommonCreateParams(ctx.handle, common_create_params_ref)
         error_check(ctx, result)
         return common_create_params_ref[]
@@ -38,7 +38,7 @@ end
 function OraConnCreateParams(ctx::Context, safe_params::ConnCreateParams)
 
     function EmptyOraConnCreateParams(ctx::Context)
-        new_conn_create_params = OraConnCreateParams(ORA_MODE_AUTH_DEFAULT, C_NULL, 0, ORA_PURITY_DEFAULT, C_NULL, 0, C_NULL, 0, 0, C_NULL, C_NULL, C_NULL, 0, 0, C_NULL, 0, 0, C_NULL, 0, C_NULL, 0)
+        new_conn_create_params = OraConnCreateParams(ORA_MODE_AUTH_DEFAULT, C_NULL, 0, ORA_PURITY_DEFAULT, C_NULL, 0, C_NULL, 0, 0, C_NULL, C_NULL, C_NULL, 0, 0, C_NULL, 0, 0, C_NULL, 0, C_NULL, 0, 0)
         conn_create_params_ref = Ref{OraConnCreateParams}(new_conn_create_params)
         result = dpiContext_initConnCreateParams(ctx.handle, conn_create_params_ref)
         error_check(ctx, result)

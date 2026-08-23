@@ -18,6 +18,9 @@ based on [ODPI-C](https://github.com/oracle/odpi) bindings.
 
 This package requires Oracle's [Instant Client](https://www.oracle.com/technetwork/database/database-technologies/instant-client/overview/index.html).
 
+Since this package bundles ODPI-C 6, Instant Client **19c or later** is required.
+Use Oracle.jl v0.3.4 or earlier if you need to work with an older client library.
+
 To install it, follow these instructions:
 
 * [Download](https://www.oracle.com/technetwork/database/database-technologies/instant-client/downloads/index.html) instant client.

@@ -72,6 +72,7 @@ mutable struct OraCommonCreateParams
     driver_name_length::UInt32 # Specifies the length of the OraCommonCreateParams.driverName member, in bytes. The default value is 0.
     soda_metadata_cache::Cint # Specifies whether to enable the SODA metadata cache or not
     stmt_cache_size::UInt32 # Specifies the number of statements to retain in the statement cache. Use a value of 0 to disable the statement cache completely.
+    access_token::Ptr{Cvoid} # OraAccessToken*, for token based authentication. The default value is NULL.
 end
 
 struct OraAppContext
@@ -105,6 +106,7 @@ mutable struct OraConnCreateParams
     num_sharding_key_columns::UInt8 # TODO
     super_sharding_key_columns::Ptr{Cvoid} # TODO
     num_super_sharding_key_columns::UInt8 # TODO
+    out_new_session::Cint # Populated upon successful creation of a connection: 1 if a new session was created, 0 if it was acquired from the pool.
 end
 
 mutable struct OraPoolCreateParams
@@ -123,6 +125,9 @@ mutable struct OraPoolCreateParams
     max_lifetime_session::UInt32 # Specifies the maximum length of time (in seconds) a pooled session may exist. Sessions in use will not be closed. They become candidates for termination only when they are released back to the pool and have existed for longer than maxLifetimeSession seconds. Session termination only occurs when the pool is accessed. The default value is 0 which means that there is no maximum length of time that a pooled session may exist. This value can be set after the pool has been created using the function dpiPool_setMaxLifetimeSession() and acquired using the function dpiPool_getMaxLifetimeSession().
     plsql_fixup_callback::Ptr{UInt8}
     plsql_fixup_callback_length::UInt32
+    max_sessions_per_shard::UInt32 # Specifies the maximum number of sessions per shard. The default value is 0.
+    access_token_callback::Ptr{Cvoid} # Callback invoked when the token in `access_token` has expired. The default value is NULL.
+    access_token_callback_context::Ptr{Cvoid} # Context passed to `access_token_callback`. The default value is NULL.
 end
 
 struct OraDataTypeInfo
@@ -134,8 +139,19 @@ struct OraDataTypeInfo
     size_in_chars::UInt32 # Specifies the size in characters of the data. This value is only populated for string data. For all other data the value is zero.
     precision::Int16 # Specifies the precision of the data. This value is only populated for numeric and interval data. For all other data the value is zero.
     scale::Int8 # Specifies the scale of the data. This value is only populated for numeric data. For all other data the value is zero.
-    fs_precision::Int16 # Specifies the fractional seconds precision of the data. This value is only populated for timestamp and interval day to second data. For all other data the value is zero.
+    fs_precision::UInt8 # Specifies the fractional seconds precision of the data. This value is only populated for timestamp and interval day to second data. For all other data the value is zero.
     object_type_handle::Ptr{Cvoid} # Specifies a reference to the type of the object. This value is only populated for named type data. For all other data the value is NULL. This reference is owned by the object attribute, object type or statement and a call to OraObjectType_addRef() must be made if the reference is going to be used beyond the lifetime of the owning object.
+    is_json::Cint # Specifies if the data is JSON (1) or not (0).
+    domain_schema::Ptr{UInt8} # Schema of the SQL domain associated with the column, or NULL.
+    domain_schema_length::UInt32
+    domain_name::Ptr{UInt8} # Name of the SQL domain associated with the column, or NULL.
+    domain_name_length::UInt32
+    num_annotations::UInt32 # Number of annotations associated with the column.
+    annotations::Ptr{Cvoid} # OraAnnotation*, owned by the statement or object type.
+    is_oson::Cint # Specifies if the data is OSON (1) or not (0).
+    vector_dimensions::UInt32 # Number of dimensions of a VECTOR column.
+    vector_format::UInt8 # Storage format of a VECTOR column.
+    vector_flags::UInt8 # Flags of a VECTOR column.
 end
 
 struct OraQueryInfo
@@ -152,6 +168,8 @@ struct OraStmtInfo
     is_DML::Int32
     statement_type::OraStatementType
     is_returning::Int32
+    sql_id::Ptr{UInt8} # SQL_ID of the statement, populated after execution.
+    sql_id_length::UInt32
 end
 
 "High-level version for OraStmtInfo using Bool Julia type."
@@ -565,6 +583,8 @@ struct OraObjectTypeInfo
     is_collection::Cint
     element_type_info::OraDataTypeInfo # is only valid if the object type if a collection
     num_attributes::UInt16
+    package_name::Ptr{UInt8} # Name of the PL/SQL package the type belongs to, or NULL.
+    package_name_length::UInt32
 end
 
 # wraps a handle to dpiObjectType
