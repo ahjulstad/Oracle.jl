@@ -90,6 +90,12 @@ function DBInterface.execute(conn::DBConnection, sql::AbstractString; kwargs...)
     end
 end
 
+bind_param!(stmt::Stmt, position::Integer, value) = stmt[position] = value
+
+# A positional NULL carries no type, so bind it as a NULL string and let Oracle convert.
+bind_param!(stmt::Stmt, position::Integer, ::Missing) =
+    stmt[position, ORA_ORACLE_TYPE_VARCHAR, ORA_NATIVE_TYPE_BYTES] = missing
+
 """
     DBInterface.execute(conn::DBConnection, sql::AbstractString, params; kwargs...) -> ResultSet
 
@@ -99,7 +105,7 @@ function DBInterface.execute(conn::DBConnection, sql::AbstractString, params; kw
     stmt = Stmt(conn.conn, sql)
     try
         for (i, param) in enumerate(params)
-            stmt[i] = param
+            bind_param!(stmt, i, param)
         end
         return execute_and_fetch_all!(stmt)
     finally
@@ -124,7 +130,7 @@ Execute prepared statement with parameters.
 """
 function DBInterface.execute(stmt::Stmt, params; kwargs...)
     for (i, param) in enumerate(params)
-        stmt[i] = param
+        bind_param!(stmt, i, param)
     end
     return execute_and_fetch_all!(stmt)
 end

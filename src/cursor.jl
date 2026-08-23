@@ -126,6 +126,7 @@ end
 
 Base.length(row::ResultSetRow) = length(row.data)
 Base.isempty(row::ResultSetRow) = isempty(row.data)
+Base.iterate(row::ResultSetRow, state...) = iterate(row.data, state...)
 
 @inline function Base.getindex(row::ResultSetRow, column_index::Integer)
     check_inbounds(row, column_index)
