@@ -4,6 +4,7 @@ module Oracle
 import Tables
 import DBInterface
 using Dates
+using UUIDs: UUID
 
 const DEPS_FILE = joinpath(@__DIR__, "..", "deps", "deps.jl")
 if !isfile(DEPS_FILE)
@@ -23,6 +24,7 @@ include("types.jl")
 include("odpi.jl")
 include("timestamps.jl")
 include("ora_timestamp.jl")
+include("interval.jl")
 include("context.jl")
 include("connection.jl")
 include("object.jl")

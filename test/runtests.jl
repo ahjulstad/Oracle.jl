@@ -13,6 +13,7 @@ import Oracle
 using Test
 using Dates
 import DataFrames
+import UUIDs
 
 @testset "ODPI version number" begin
     @test Oracle.odpi_version(998877) == v"99.88.77"
@@ -36,6 +37,38 @@ end
     @test Oracle.subtract_missing(Union{Missing, Float64}) == Float64
     @test Oracle.subtract_missing(Union{Float64, Missing}) == Float64
     @test_throws ErrorException Oracle.subtract_missing(Union{Int, Union{Float64, Missing}})
+end
+
+@testset "uuid bytes" begin
+    u = UUIDs.UUID("123e4567-e89b-12d3-a456-426614174000")
+    bytes = Oracle.uuid_bytes(u)
+    @test length(bytes) == 16
+    @test bytes2hex(bytes) == "123e4567e89b12d3a456426614174000"
+    @test Oracle.uuid_from_bytes(bytes) == u
+    @test_throws ArgumentError Oracle.uuid_from_bytes(UInt8[0x01])
+
+    @test Oracle.infer_oracle_type_tuple(u) ==
+        Oracle.OracleTypeTuple(Oracle.ORA_ORACLE_TYPE_RAW, Oracle.ORA_NATIVE_TYPE_BYTES)
+end
+
+@testset "intervals" begin
+    ds = Oracle.OraIntervalDS(Day(2) + Hour(3) + Minute(4) + Second(5) + Nanosecond(6))
+    @test ds == Oracle.OraIntervalDS(2, 3, 4, 5, 6)
+    @test Oracle.parse_interval_ds(ds) == Day(2) + Hour(3) + Minute(4) + Second(5) + Nanosecond(6)
+
+    @test Oracle.OraIntervalDS(Hour(-25)) == Oracle.OraIntervalDS(-1, -1, 0, 0, 0)
+    @test Oracle.OraIntervalDS(Millisecond(1500)) == Oracle.OraIntervalDS(0, 0, 0, 1, 500_000_000)
+
+    ym = Oracle.OraIntervalYM(Year(3) + Month(7))
+    @test ym == Oracle.OraIntervalYM(3, 7)
+    @test Oracle.parse_interval_ym(ym) == Year(3) + Month(7)
+    @test Oracle.OraIntervalYM(Month(14)) == Oracle.OraIntervalYM(1, 2)
+
+    @test_throws ArgumentError Oracle.OraIntervalDS(Year(1))
+    @test_throws ArgumentError Oracle.OraIntervalYM(Day(1))
+
+    @test Oracle.infer_oracle_type_tuple(Year(1)).oracle_type == Oracle.ORA_ORACLE_TYPE_INTERVAL_YM
+    @test Oracle.infer_oracle_type_tuple(Day(1)).oracle_type == Oracle.ORA_ORACLE_TYPE_INTERVAL_DS
 end
 
 if !isfile(joinpath(@__DIR__, "credentials.jl"))
@@ -1841,5 +1874,76 @@ end
     Oracle.startup_database(conn)
 end
 =#
+
+@testset "Bind datatypes round-trip" begin
+    Oracle.execute(conn, """
+        CREATE TABLE TB_BIND_TYPES (
+            R RAW(16), G RAW(16), B BLOB, C CLOB,
+            D DATE, TS TIMESTAMP(9), TSTZ TIMESTAMP(9) WITH TIME ZONE,
+            IDS INTERVAL DAY(3) TO SECOND(9), IYM INTERVAL YEAR(4) TO MONTH,
+            SMALL_INT NUMBER(10), F NUMBER
+        )
+    """)
+
+    uuid = UUIDs.UUID("123e4567-e89b-12d3-a456-426614174000")
+    raw_bytes = UInt8[0x01, 0x02, 0x03]
+    big_bytes = rand(UInt8, 60_000)
+    long_text = repeat("y", 8_000)
+    tstz = Oracle.TimestampTZ(false, 2021, 3, 4, 5, 6, 7, 123456789, 2, 30)
+    ids = Day(2) + Hour(3) + Minute(4) + Second(5)
+    iym = Year(3) + Month(7)
+
+    Oracle.stmt(conn, """
+        INSERT INTO TB_BIND_TYPES (R, G, B, C, D, TS, TSTZ, IDS, IYM, SMALL_INT, F)
+        VALUES (:r, :g, :b, :c, :d, :ts, :tstz, :ids, :iym, :small_int, :f)
+    """) do stmt
+        stmt[:r] = raw_bytes
+        stmt[:g] = uuid
+        stmt[:b] = big_bytes
+        stmt[:c] = long_text
+        stmt[:d] = Date(2021, 3, 4)
+        stmt[:ts] = DateTime(2021, 3, 4, 5, 6, 7, 890)
+        stmt[:tstz] = tstz
+        stmt[:ids] = ids
+        stmt[:iym] = iym
+        stmt[:small_int] = Int32(42)
+        stmt[:f] = Float32(1.5)
+        Oracle.execute(stmt)
+        Oracle.commit(conn)
+    end
+
+    Oracle.query(conn, "SELECT R, G, B, C, D, TS, TSTZ, IDS, IYM, SMALL_INT, F FROM TB_BIND_TYPES") do cursor
+        for row in cursor
+            @test row["R"] == raw_bytes
+            @test Oracle.uuid_from_bytes(row["G"]) == uuid
+            @test read(row["B"]) == big_bytes
+            @test read(row["C"]) == long_text
+            @test row["D"] == DateTime(2021, 3, 4)
+            @test row["TS"] == DateTime(2021, 3, 4, 5, 6, 7, 890)
+            @test row["TSTZ"] == tstz
+            @test row["IDS"] == ids
+            @test row["IYM"] == iym
+            @test row["SMALL_INT"] == 42
+            @test row["F"] == 1.5
+        end
+    end
+
+    Oracle.execute(conn, "DROP TABLE TB_BIND_TYPES")
+end
+
+@testset "ROWID" begin
+    Oracle.execute(conn, "CREATE TABLE TB_ROWID ( X NUMBER(5) )")
+    Oracle.execute(conn, "INSERT INTO TB_ROWID ( X ) VALUES ( 1 )")
+    Oracle.commit(conn)
+
+    Oracle.query(conn, "SELECT ROWID FROM TB_ROWID") do cursor
+        for row in cursor
+            @test isa(row[1], String)
+            @test !isempty(row[1])
+        end
+    end
+
+    Oracle.execute(conn, "DROP TABLE TB_ROWID")
+end
 
 Oracle.close(conn)

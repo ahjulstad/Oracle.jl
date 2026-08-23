@@ -98,10 +98,8 @@ Execute SQL statement with parameters.
 function DBInterface.execute(conn::DBConnection, sql::AbstractString, params; kwargs...)
     stmt = Stmt(conn.conn, sql)
     try
-        if !isempty(params)
-            for (i, param) in enumerate(params)
-                bind(stmt, i, param)
-            end
+        for (i, param) in enumerate(params)
+            stmt[i] = param
         end
         return execute_and_fetch_all!(stmt)
     finally
@@ -125,10 +123,8 @@ end
 Execute prepared statement with parameters.
 """
 function DBInterface.execute(stmt::Stmt, params; kwargs...)
-    if !isempty(params)
-        for (i, param) in enumerate(params)
-            bind(stmt, i, param)
-        end
+    for (i, param) in enumerate(params)
+        stmt[i] = param
     end
     return execute_and_fetch_all!(stmt)
 end

@@ -88,6 +88,10 @@ function Base.setindex!(variable::Variable, value::Lob, pos::Integer)
     nothing
 end
 
+# EXPERIMENTAL: stored as `RAW(16)` in big-endian (RFC 4122) byte order.
+Base.setindex!(variable::Variable, value::UUID, pos::Integer) =
+    setindex!(variable, uuid_bytes(value), pos)
+
 function Base.getindex(variable::Variable, pos::Integer)
     check_bounds(variable, pos)
     oracle_value = ExternOracleValue(variable, variable.oracle_type, variable.native_type, variable.buffer_handle)

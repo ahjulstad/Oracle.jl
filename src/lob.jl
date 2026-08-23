@@ -136,6 +136,10 @@ for ora_type in (ORA_ORACLE_TYPE_CLOB, ORA_ORACLE_TYPE_NCLOB)
     end
 end
 
+Base.convert(::Type{Vector{UInt8}}, blob::Lob{ORA_ORACLE_TYPE_BLOB}) = read(blob)
+Base.convert(::Type{String}, clob::Lob{ORA_ORACLE_TYPE_CLOB}) = read(clob)
+Base.convert(::Type{String}, clob::Lob{ORA_ORACLE_TYPE_NCLOB}) = read(clob)
+
 abstract type LobDataType end
 
 struct BinaryLob <: LobDataType end

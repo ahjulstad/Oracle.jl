@@ -184,6 +184,31 @@ end
         end
     end
 
+    if N == ORA_NATIVE_TYPE_INTERVAL_DS
+        return quote
+            local iv::OraIntervalDS = unsafe_load(dpiData_getIntervalDS(data_handle))
+            return parse_interval_ds(iv)
+        end
+    end
+
+    if N == ORA_NATIVE_TYPE_INTERVAL_YM
+        return quote
+            local iv::OraIntervalYM = unsafe_load(dpiData_getIntervalYM(data_handle))
+            return parse_interval_ym(iv)
+        end
+    end
+
+    if N == ORA_NATIVE_TYPE_ROWID
+        return quote
+            rowid_handle = dpiData_getRowid(data_handle)
+            value_ref = Ref{Ptr{UInt8}}()
+            value_length_ref = Ref{UInt32}(0)
+            result = dpiRowid_getStringValue(rowid_handle, value_ref, value_length_ref)
+            error_check(context(parent(val)), result)
+            return unsafe_string(value_ref[], value_length_ref[])
+        end
+    end
+
     if O == ORA_ORACLE_TYPE_NATIVE_INT
         @assert N == ORA_NATIVE_TYPE_INT64
 
@@ -244,6 +269,24 @@ end
     if N == ORA_NATIVE_TYPE_DOUBLE
         return quote
             dpiData_setDouble(at, val)
+        end
+    end
+
+    if N == ORA_NATIVE_TYPE_FLOAT
+        return quote
+            dpiData_setFloat(at, val)
+        end
+    end
+
+    if N == ORA_NATIVE_TYPE_INTERVAL_DS
+        return quote
+            dpiData_setIntervalDS(at, OraIntervalDS(val))
+        end
+    end
+
+    if N == ORA_NATIVE_TYPE_INTERVAL_YM
+        return quote
+            dpiData_setIntervalYM(at, OraIntervalYM(val))
         end
     end
 
@@ -334,6 +377,16 @@ struct OracleTypeTuple
     native_type::OraNativeTypeNum
 end
 
+"Big-endian (RFC 4122) byte representation of `u`."
+uuid_bytes(u::UUID) = reverse!(collect(reinterpret(UInt8, [u.value])))
+
+"Decode a 16-byte big-endian `RAW` value, as stored by [`uuid_bytes`](@ref), back into a `UUID`."
+function uuid_from_bytes(bytes::AbstractVector{UInt8}) :: UUID
+    length(bytes) == 16 ||
+        throw(ArgumentError("a UUID requires exactly 16 bytes, got $(length(bytes))."))
+    return UUID(only(reinterpret(UInt128, reverse(collect(bytes)))))
+end
+
 # accept julia types as arguments
 @inline infer_oracle_type_tuple(::Type{Bool}) = OracleTypeTuple(ORA_ORACLE_TYPE_BOOLEAN, ORA_NATIVE_TYPE_BOOLEAN)
 @inline infer_oracle_type_tuple(::Type{Float64}) = OracleTypeTuple(ORA_ORACLE_TYPE_NATIVE_DOUBLE, ORA_NATIVE_TYPE_DOUBLE)
@@ -342,16 +395,22 @@ end
 @inline infer_oracle_type_tuple(::Type{Date}) = OracleTypeTuple(ORA_ORACLE_TYPE_DATE, ORA_NATIVE_TYPE_TIMESTAMP)
 @inline infer_oracle_type_tuple(::Type{DateTime}) = infer_oracle_type_tuple(Timestamp)
 @inline infer_oracle_type_tuple(::Type{Timestamp}) = OracleTypeTuple(ORA_ORACLE_TYPE_TIMESTAMP, ORA_NATIVE_TYPE_TIMESTAMP)
+@inline infer_oracle_type_tuple(::Type{UUID}) = OracleTypeTuple(ORA_ORACLE_TYPE_RAW, ORA_NATIVE_TYPE_BYTES)
 
 # see issue #21
 #@inline infer_oracle_type_tuple(::Type{OraNumber}) = OracleTypeTuple(ORA_ORACLE_TYPE_NUMBER, ORA_NATIVE_TYPE_NUMBER)
 
 # accept julia values as arguments
-for type_sym in (:Bool, :Float64, :Int64, :UInt64, :Date, :DateTime, :Timestamp)
+for type_sym in (:Bool, :Float64, :Int64, :UInt64, :Date, :DateTime, :Timestamp, :UUID)
     @eval begin
         @inline infer_oracle_type_tuple(::$type_sym) = infer_oracle_type_tuple($type_sym)
     end
 end
+
+@inline infer_oracle_type_tuple(p::Union{Dates.Period, Dates.CompoundPeriod}) =
+    is_year_month_period(p) ?
+        OracleTypeTuple(ORA_ORACLE_TYPE_INTERVAL_YM, ORA_NATIVE_TYPE_INTERVAL_YM) :
+        OracleTypeTuple(ORA_ORACLE_TYPE_INTERVAL_DS, ORA_NATIVE_TYPE_INTERVAL_DS)
 
 @inline infer_oracle_type_tuple(::Type{Lob{O,P}}) where {O,P} = OracleTypeTuple(O, ORA_NATIVE_TYPE_LOB)
 @inline infer_oracle_type_tuple(::Lob{O,P}) where {O,P} = OracleTypeTuple(O, ORA_NATIVE_TYPE_LOB)

@@ -447,6 +447,26 @@ function dpiData_getTimestamp(dpi_data_handle::Ref{OraData})
     ccall((:dpiData_getTimestamp, libdpi), Ptr{OraTimestamp}, (Ref{OraData},), dpi_data_handle)
 end
 
+# dpiIntervalDS *dpiData_getIntervalDS(dpiData *data)
+function dpiData_getIntervalDS(dpi_data_handle::Ref{OraData})
+    ccall((:dpiData_getIntervalDS, libdpi), Ptr{OraIntervalDS}, (Ref{OraData},), dpi_data_handle)
+end
+
+# dpiIntervalYM *dpiData_getIntervalYM(dpiData *data)
+function dpiData_getIntervalYM(dpi_data_handle::Ref{OraData})
+    ccall((:dpiData_getIntervalYM, libdpi), Ptr{OraIntervalYM}, (Ref{OraData},), dpi_data_handle)
+end
+
+# libdpi has no `dpiData_getRowid` accessor; read `dpiData.value.asRowid` from the union directly.
+function dpiData_getRowid(dpi_data_handle::Ptr{OraData})
+    unsafe_load(Ptr{Ptr{Cvoid}}(dpi_data_handle + fieldoffset(OraData, 2)))
+end
+
+# int dpiRowid_getStringValue(dpiRowid *rowid, const char **value, uint32_t *valueLength)
+function dpiRowid_getStringValue(rowid_handle::Ptr{Cvoid}, value::Ref{Ptr{UInt8}}, value_length::Ref{UInt32})
+    ccall((:dpiRowid_getStringValue, libdpi), OraResult, (Ptr{Cvoid}, Ref{Ptr{UInt8}}, Ref{UInt32}), rowid_handle, value, value_length)
+end
+
 # int dpiData_getIsNull(dpiData *data)
 function dpiData_getIsNull(data_handle::Ref{OraData})
     ccall((:dpiData_getIsNull, libdpi), Cint, (Ref{OraData},), data_handle)
@@ -491,6 +511,21 @@ end
 # void dpiData_setDouble(dpiData *data, double value)
 function dpiData_setDouble(dpi_data_ptr::Ref{OraData}, value::Float64)
     ccall((:dpiData_setDouble, libdpi), Cvoid, (Ref{OraData}, Cdouble), dpi_data_ptr, value)
+end
+
+# void dpiData_setFloat(dpiData *data, float value)
+function dpiData_setFloat(dpi_data_ptr::Ref{OraData}, value::Float32)
+    ccall((:dpiData_setFloat, libdpi), Cvoid, (Ref{OraData}, Float32), dpi_data_ptr, value)
+end
+
+# void dpiData_setIntervalDS(dpiData *data, int32_t days, int32_t hours, int32_t minutes, int32_t seconds, int32_t fseconds)
+function dpiData_setIntervalDS(dpi_data_ptr::Ref{OraData}, iv::OraIntervalDS)
+    ccall((:dpiData_setIntervalDS, libdpi), Cvoid, (Ref{OraData}, Int32, Int32, Int32, Int32, Int32), dpi_data_ptr, iv.days, iv.hours, iv.minutes, iv.seconds, iv.fseconds)
+end
+
+# void dpiData_setIntervalYM(dpiData *data, int32_t years, int32_t months)
+function dpiData_setIntervalYM(dpi_data_ptr::Ref{OraData}, iv::OraIntervalYM)
+    ccall((:dpiData_setIntervalYM, libdpi), Cvoid, (Ref{OraData}, Int32, Int32), dpi_data_ptr, iv.years, iv.months)
 end
 
 # void dpiData_setInt64(dpiData *data, int64_t value)

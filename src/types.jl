@@ -145,6 +145,21 @@ struct OraQueryInfo
     null_ok::Int32 # Specifies if the data that is being queried may return null values (1) or not (0).
 end
 
+"Mirrors `dpiIntervalDS`: an Oracle `INTERVAL DAY TO SECOND` value."
+struct OraIntervalDS
+    days::Int32
+    hours::Int32
+    minutes::Int32
+    seconds::Int32
+    fseconds::Int32 # nanoseconds
+end
+
+"Mirrors `dpiIntervalYM`: an Oracle `INTERVAL YEAR TO MONTH` value."
+struct OraIntervalYM
+    years::Int32
+    months::Int32
+end
+
 struct OraStmtInfo
     is_query::Int32
     is_PLSQL::Int32
@@ -309,6 +324,8 @@ mutable struct Stmt{statement_type}
     bind_names_index::Dict{String, UInt32} # maps bind_name to bind position
     is_open::Bool
     columns_info::Union{Nothing, Vector{OraQueryInfo}}
+    # Keeps `Variable`/`Lob` objects created by `setindex!` alive until the statement is released.
+    bound_resources::Vector{Any}
 
     function Stmt(connection::Connection, handle::Ptr{Cvoid}, scrollable::Bool; fetch_array_size::Integer=ORA_DEFAULT_FETCH_ARRAY_SIZE)
 
@@ -361,7 +378,7 @@ mutable struct Stmt{statement_type}
             end
         end
 
-        new_stmt = new{stmt_info.statement_type}(connection, handle, scrollable, stmt_info, bind_count, bind_names, bind_names_index, true, nothing)
+        new_stmt = new{stmt_info.statement_type}(connection, handle, scrollable, stmt_info, bind_count, bind_names, bind_names_index, true, nothing, Any[])
         fetch_array_size!(new_stmt, fetch_array_size)
         finalizer(destroy!, new_stmt)
         return new_stmt
@@ -376,6 +393,7 @@ function destroy!(stmt::Stmt)
         error_check(context(stmt), result)
         stmt.handle = C_NULL
     end
+    empty!(stmt.bound_resources)
     nothing
 end
 

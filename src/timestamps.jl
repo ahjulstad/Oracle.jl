@@ -129,4 +129,9 @@ function Base.convert(::Type{Date}, ts::Timestamp)
     return convert(Date, convert(DateTime, ts))
 end
 
+Dates.DateTime(ts::Timestamp) = convert(DateTime, ts)
+Dates.Date(ts::Timestamp) = convert(Date, ts)
+Dates.DateTime(ts::TimestampTZ) = convert(DateTime, ts.ts)
+Dates.Date(ts::TimestampTZ) = convert(Date, ts.ts)
+
 end # module Timestamps
